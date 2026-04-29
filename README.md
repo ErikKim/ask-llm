@@ -30,23 +30,56 @@
 
 Python 3.9+ 필요. 외부 Python 의존성은 없습니다.
 
-### 방법 1 — `pipx` (권장, 격리 설치)
+이 레포는 두 가지 사용처를 동시에 지원합니다.
+
+- **Claude Code 스킬로 사용** — `SKILL.md` + `ask_llm.py` 두 파일이 핵심. 사용자가 `~/.claude/skills/ask-llm/` 에 떨어지기만 하면 됨.
+- **시스템 CLI로 사용** — 같은 `ask_llm.py` 가 `pipx`/`pip` 로도 설치 가능 (`ask-llm` 명령 노출).
+
+### 방법 1 — Claude Code Skill 로 설치 (가장 빠름)
+
+레포 자체를 그대로 `~/.claude/skills/ask-llm/` 으로 clone 하면 끝납니다.
+`SKILL.md` 와 `ask_llm.py` 가 그 폴더에 함께 자리잡고, Claude Code 가 자동 인식합니다.
+
+```bash
+# user-level (모든 프로젝트에서 공통 사용)
+git clone https://github.com/ErikKim/ask-llm.git ~/.claude/skills/ask-llm
+
+# 또는 특정 프로젝트 단위
+cd <your-project>
+git clone https://github.com/ErikKim/ask-llm.git .claude/skills/ask-llm
+```
+
+업데이트:
+
+```bash
+cd ~/.claude/skills/ask-llm && git pull
+```
+
+호출은 SKILL.md 안내대로:
+
+```bash
+python3 ~/.claude/skills/ask-llm/ask_llm.py "한 줄 요약 부탁: ..."
+```
+
+또는 Claude Code 안에서 `/ask-llm` / "GPT한테 물어봐" 류 자연어 요청 시 자동 트리거.
+
+### 방법 2 — `pipx` (시스템 CLI 로 격리 설치)
 
 ```bash
 pipx install git+https://github.com/ErikKim/ask-llm.git
 ask-llm --version
 ```
 
-### 방법 2 — `pip` (수정/개발용)
+### 방법 3 — `pip` (수정 / 개발용)
 
 ```bash
 git clone https://github.com/ErikKim/ask-llm.git
 cd ask-llm
-pip install -e .          # `ask-llm` 명령이 PATH에 노출됨
+pip install -e .          # `ask-llm` 명령이 PATH 에 노출됨
 ask-llm --version
 ```
 
-### 방법 3 — 스크립트 직접 실행 (설치 없이)
+### 방법 4 — 스크립트 직접 실행 (설치 없이)
 
 ```bash
 git clone https://github.com/ErikKim/ask-llm.git
