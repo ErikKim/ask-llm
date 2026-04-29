@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ask-llm"
+version = "0.1.0"
+description = "Retry + fallback wrapper for the codex and gemini command-line tools."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "ErikKim" }]
+keywords = ["llm", "cli", "retry", "fallback", "codex", "gemini", "wrapper"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: POSIX",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Topic :: Utilities",
+  "Environment :: Console",
+]
+
+[project.scripts]
+ask-llm = "ask_llm:main"
+
+[tool.setuptools]
+py-modules = ["ask_llm"]
