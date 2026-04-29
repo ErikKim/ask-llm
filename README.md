@@ -28,22 +28,46 @@ doesn't crash your script.
 
 ## Install
 
+Requires Python 3.9+. There are no third-party Python dependencies.
+
+### Option 1 — `pipx` (recommended, isolated)
+
 ```bash
-git clone https://github.com/<your-user>/ask-llm.git
+pipx install git+https://github.com/ErikKim/ask-llm.git
+ask-llm --version
+```
+
+### Option 2 — `pip` (editable / for hacking)
+
+```bash
+git clone https://github.com/ErikKim/ask-llm.git
 cd ask-llm
 pip install -e .          # exposes the `ask-llm` command
+ask-llm --version
 ```
 
-Or use the script directly without installing — it has no third-party deps:
+### Option 3 — run the script directly (no install)
 
 ```bash
-python3 ask_llm.py "hello"
+git clone https://github.com/ErikKim/ask-llm.git
+python3 ask-llm/ask_llm.py "hello"
 ```
 
-You'll also need at least one of the upstream CLIs on your `PATH`:
+### Upstream CLIs
 
-- `codex` — install via the [Codex CLI README](https://github.com/openai/codex)
-- `gemini` — install via the [Gemini CLI README](https://github.com/google-gemini/gemini-cli)
+You also need at least one of the upstream CLIs on your `PATH` and signed in:
+
+| provider | install | sign in |
+| -------- | ------- | ------- |
+| `codex`  | [Codex CLI README](https://github.com/openai/codex) | `codex login` (or set `OPENAI_API_KEY`) |
+| `gemini` | [Gemini CLI README](https://github.com/google-gemini/gemini-cli) | `gemini auth login` |
+
+Verify they work standalone before using `ask-llm`:
+
+```bash
+codex exec  "say hi"
+gemini -p   "say hi"
+```
 
 ## Usage
 
