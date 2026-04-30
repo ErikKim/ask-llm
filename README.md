@@ -2,43 +2,96 @@
 
 ![hero](docs/hero.png)
 
-[`codex`](https://github.com/openai/codex)(GPT) 와 [`gemini`](https://github.com/google-gemini/gemini-cli) CLI를
-**자동 재시도 + 한쪽 죽으면 다른 쪽으로 폴백** 시켜 주는 작은 래퍼입니다.
-**한 번은 실패해도, 답은 받고 끝낸다** 가 유일한 목표.
+**Claude 한 세션 안에서 [`codex`](https://github.com/openai/codex)(GPT) 와 [`gemini`](https://github.com/google-gemini/gemini-cli) 를 에이전트처럼 부르는 작은 래퍼.**
+평소엔 Claude 가 직접 답하고, 자기가 못 하는 일이 있을 때만 다른 친구한테 부탁합니다.
+부수효과로 자동 재시도 + 폴백까지 같이 따라옵니다.
 
-설계 원칙은 의도적으로 좁게:
+[English README →](README.en.md)
 
-- 두 provider만 지원 — `codex`(OpenAI) / `gemini`(Google).
+설계는 일부러 좁게 잡았어요:
+
+- 두 친구만 — `codex`(OpenAI) / `gemini`(Google).
 - MCP·Ollama·스트리밍·대화 컨텍스트 안 건드림. one-shot 전용.
 - Python 표준 라이브러리만. 외부 의존성 0개.
 - 코드는 단일 파일 `ask_llm.py`.
 
-## 왜 필요한가
+## 누구에게 부탁할까
 
-`codex exec` 와 `gemini -p` 는 평소엔 잘 동작하지만, 가끔 이렇게 죽습니다:
+평소엔 Claude 가 직접 답해요. **Claude 가 자기 능력으로 못 하는 일** 일 때만 친구를 부르죠.
 
-- 네트워크 흔들려서 stdout이 그냥 빈 문자열로 옴
-- 1분 동안 호출이 몰려 429 rate-limit
-- 토큰 갱신 직후 한 번만 401 떠서 스크립트가 통째로 멈춤
-- 모델이 길을 잃고 timeout
+| 일 | 부르는 친구 | 이유 |
+| --- | --- | --- |
+| 그림 그려줘 (PNG 출력) | **codex** | OpenAI Images API 로 픽셀 합성 가능 |
+| 이 영상 / 음성 분석해줘 | **gemini** | Gemini 의 native 동영상·오디오 입력 |
+| 1M 토큰짜리 문서 요약 | **gemini** | Gemini 1.5 Pro 의 1M ctx |
+| 이 코드 직접 돌려서 결과 보여줘 | **codex** / **gemini** | 둘 다 sandbox-write 보유 |
 
-`ask-llm` 은 jitter가 들어간 지수 백오프로 재시도하고, 영구 인증 오류는
-바로 포기해 빠르게 다음 provider로 넘어갑니다. 일시적인 한 번의 글리치 때문에
-사용 측 스크립트가 멈추지 않게 하는 게 전부입니다.
+추론·코드 작성·요약·번역·도메인 분석 같은 영역은 호출하지 않아요. Claude 가
+자기 컨텍스트로 직접 답하는 게 더 빠르고 일관됩니다.
+
+## 그냥 말로 시키면 돼요
+
+Claude Code 안에서 자연어로 부르면 자동 트리거:
+
+- "이미지 만들어줘" → **codex**
+- "GPT 한테 그려달라고 해" → **codex**
+- "이 영상 분석해줘" → **gemini**
+- "긴 문서 요약 시켜" → **gemini**
+
+직접 부르고 싶으면:
+
+```bash
+ask-llm --provider codex  "..."
+ask-llm --provider gemini "..."
+
+# 자동 라우팅 (codex 시도 → 실패 시 gemini 폴백)
+ask-llm "..."
+```
+
+## 가끔 친구가 답을 안 줘요
+
+`codex exec` 와 `gemini -p` 는 평소엔 잘 도는데, 가끔 이렇게 깨져요:
+
+- 빈 답이 옴 (네트워크 흔들)
+- 너무 많이 물어서 거부 (429 rate-limit)
+- 로그인 풀려서 거부 (401)
+- 답이 너무 늦어 timeout
+
+## 한 명이 안 되면 다른 친구에게
+
+```
+                 ┌───── codex ─────┐
+prompt ─► auto ──┤                 ├──► 먼저 비어있지 않은 답이 나오는 쪽 채택
+                 └───── gemini ────┘
+
+provider 단위:  시도 1 ─► 시도 2 ─► 시도 3
+                  └─ stderr 에 401/403/expired/"please login" 보이면 즉시 포기
+                  └─ 429/rate limit/quota 신호면 백오프를 더 길게
+                  └─ stdout 비어있음 / non-zero exit / timeout 은 재시도
+```
+
+- 한 친구한테 3번까지 다시 물어보고
+- 로그인 만료면 바로 다른 친구로
+- 너무 바쁜 친구면 잠깐 기다렸다가
+- 둘 다 안 되면 솔직히 실패 알림 (exit 1)
+
+`ask-llm` 은 jitter 들어간 지수 백오프로 다시 물어보고, 영구 인증 오류면
+미련 없이 접고 바로 다음 친구한테 넘어갑니다. 한 번의 글리치 때문에 호출자
+스크립트가 통째로 멈추지 않게 하는 게 전부예요.
 
 ## 설치
 
-Python 3.9+ 필요. 외부 Python 의존성은 없습니다.
+Python 3.9+ 필요. 외부 Python 의존성은 없어요.
 
-이 레포는 두 가지 사용처를 동시에 지원합니다.
+이 레포는 두 가지 사용처를 동시에 지원해요.
 
-- **Claude Code 스킬로 사용** — `SKILL.md` + `ask_llm.py` 두 파일이 핵심. 사용자가 `~/.claude/skills/ask-llm/` 에 떨어지기만 하면 됨.
-- **시스템 CLI로 사용** — 같은 `ask_llm.py` 가 `pipx`/`pip` 로도 설치 가능 (`ask-llm` 명령 노출).
+- **Claude Code 스킬로 쓰기** — `SKILL.md` + `ask_llm.py` 두 파일이 핵심. `~/.claude/skills/ask-llm/` 에 떨어뜨리기만 하면 됨.
+- **시스템 CLI로 쓰기** — 같은 `ask_llm.py` 가 `pipx`/`pip` 로도 깔립니다 (`ask-llm` 명령 노출).
 
 ### 방법 1 — Claude Code Skill 로 설치 (가장 빠름)
 
-레포 자체를 그대로 `~/.claude/skills/ask-llm/` 으로 clone 하면 끝납니다.
-`SKILL.md` 와 `ask_llm.py` 가 그 폴더에 함께 자리잡고, Claude Code 가 자동 인식합니다.
+레포 자체를 그대로 `~/.claude/skills/ask-llm/` 으로 clone 하면 끝.
+`SKILL.md` 와 `ask_llm.py` 가 그 폴더에 같이 자리잡고, Claude Code 가 알아서 인식해요.
 
 ```bash
 # user-level (모든 프로젝트에서 공통 사용)
@@ -61,7 +114,7 @@ cd ~/.claude/skills/ask-llm && git pull
 python3 ~/.claude/skills/ask-llm/ask_llm.py "한 줄 요약 부탁: ..."
 ```
 
-또는 Claude Code 안에서 `/ask-llm` / "GPT한테 물어봐" 류 자연어 요청 시 자동 트리거.
+또는 위에서 본 것처럼 Claude Code 안에서 그냥 말로 시켜도 자동 트리거.
 
 ### 방법 2 — `pipx` (시스템 CLI 로 격리 설치)
 
@@ -95,17 +148,17 @@ python3 ask-llm/ask_llm.py "hello"
 | `codex`  | [Codex CLI README](https://github.com/openai/codex) | `codex login` (또는 `OPENAI_API_KEY` 환경변수) |
 | `gemini` | [Gemini CLI README](https://github.com/google-gemini/gemini-cli) | `gemini auth login` |
 
-`ask-llm` 을 쓰기 전에 두 CLI가 단독으로 잘 동작하는지 먼저 확인하세요:
+`ask-llm` 쓰기 전에 두 CLI 가 단독으로 잘 도는지 한 번 확인해 보세요:
 
 ```bash
 codex exec  "say hi"
 gemini -p   "say hi"
 ```
 
-## 사용법
+## 옵션 정리
 
 ```bash
-# 기본 — 자동 폴백 (codex 시도 후 실패 시 gemini)
+# 자동 폴백 (codex → gemini)
 ask-llm "한 줄 요약 부탁: ..."
 
 # provider 강제 지정
@@ -118,7 +171,7 @@ cat long_prompt.txt | ask-llm -
 # 재시도 / 타임아웃 조정
 ask-llm --timeout 60 --retries 5 "..."
 
-# JSON 으로 받기 (어느 provider가 답했는지 호출자가 알 수 있게)
+# JSON 으로 받기 (어느 친구가 답했는지 알 수 있게)
 ask-llm --json "..."
 # {"provider": "codex", "output": "..."}
 ```
@@ -131,20 +184,7 @@ ask-llm --json "..."
 | `1`  | 모든 provider 실패 — `stderr` 에 마지막 에러 |
 | `2`  | 빈 프롬프트 등 사용자 입력 오류 |
 
-## 라우팅 동작
-
-```
-                 ┌───── codex ─────┐
-prompt ─► auto ──┤                 ├──► 먼저 비어있지 않은 답이 나오는 쪽 채택
-                 └───── gemini ────┘
-
-provider 단위:  시도 1 ─► 시도 2 ─► 시도 3
-                  └─ stderr 에 401/403/expired/"please login" 보이면 즉시 포기
-                  └─ 429/rate limit/quota 신호면 백오프를 더 길게
-                  └─ stdout 비어있음 / non-zero exit / timeout 은 재시도
-```
-
-## 환경변수 설정
+## 환경변수
 
 전부 선택사항입니다.
 
@@ -173,11 +213,11 @@ jq -r 'select(.ok==false) | "\(.provider) \(.stderr_head)"' \
 
 ## 의도적으로 안 하는 것
 
-- 스트리밍 출력. 답은 한 번에 한 덩어리로 옴.
-- 대화 history / 멀티턴. one-shot 만 — 컨텍스트 관리는 호출자 책임.
-- provider 추가. `codex` + `gemini` 만 유지하는 게 핵심. Anthropic / Mistral
-  필요하면 자매 스크립트로 따로 만들 것.
-- MCP 서버, 로컬 Ollama, llama.cpp. 의도적 비대상.
+- **추론·요약·번역·코드 작성을 외부 LLM 에 떠넘기기.** 그건 Claude 가 직접 답해요. 외부 호출은 Claude 가 못 하는 능력일 때만.
+- **스트리밍 출력.** 답은 한 번에 한 덩어리로 옴.
+- **대화 history / 멀티턴.** one-shot 만 — 컨텍스트 관리는 호출자(Claude) 책임.
+- **provider 추가.** `codex` + `gemini` 만 유지하는 게 핵심. Anthropic / Mistral 필요하면 자매 스크립트로 따로 만들 것.
+- **MCP 서버, 로컬 Ollama, llama.cpp.** 의도적 비대상.
 
 ## 라이선스
 
