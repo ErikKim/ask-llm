@@ -5,6 +5,9 @@ Goal: get an answer reliably, even when a single CLI invocation fails
 (empty stdout, timeout, rate limit, transient auth glitch).
 
 Scope is intentionally narrow: codex and gemini only. No MCP, no Ollama.
+The caller (typically Claude) decides *whether* to invoke this wrapper —
+ask-llm is only used when the caller cannot answer itself or when the user
+explicitly asks for an external LLM.
 """
 from __future__ import annotations
 
